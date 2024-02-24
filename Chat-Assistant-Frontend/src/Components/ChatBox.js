@@ -1,9 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-const ChatBox = () => {
+const ChatBox = ({ socket }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [isWaiting, setIsWaiting] = useState(false);
+
+  useEffect(() => {
+    const handleMessage = (data) => {
+      console.log("receive_message", data);
+      setChatHistory((prevChatHistory) => [...prevChatHistory, data]);
+      setIsWaiting(false);
+    };
+
+    socket.on("receive_message", handleMessage);
+    console.log("mounted");
+
+    return () => {
+      socket.off("receive_message", handleMessage);
+      console.log("unmounted");
+    };
+  }, [socket]);
 
   const handleSendMessage = async () => {
     if (message.trim() === "") {
@@ -13,25 +29,7 @@ const ChatBox = () => {
     setMessage("");
     setIsWaiting(true);
 
-    try {
-      const response = await fetch("http://localhost:4000/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message,
-        }),
-      });
-      if (response) {
-        const data = await response.json();
-        console.log(data);
-        chatHistory.push(data);
-        setIsWaiting(false);
-      }
-    } catch (error) {
-      console.error(error);
-    }
+    socket.emit("send_message", { userMessage: message });
   };
 
   return (

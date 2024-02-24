@@ -1,16 +1,21 @@
+import http from "http";
 import express from "express";
 import OpenAI from "openai";
 import cors from "cors";
 import dotenv from "dotenv";
+import { Server } from "socket.io";
 
 dotenv.config();
-
 const app = express();
-const apiKey = process.env.apiKey;
-console.log(apiKey);
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "http://localhost:3000", methods: ["GET", "POST"] },
+});
+
 app.use(express.json());
 app.use(cors());
 
+const apiKey = process.env.apiKey;
 const openai = new OpenAI({
   apiKey,
 });
@@ -20,7 +25,6 @@ async function getAssistantMessage(message) {
     messages: [{ role: "system", content: message }],
     model: "gpt-3.5-turbo",
   });
-
   return completion.choices[0].message.content;
 }
 
@@ -31,6 +35,22 @@ app.post("/", async (req, res) => {
   res.json({ userMessage: message, botMessage });
 });
 
-app.listen(4000, () => {
-  console.log("Server is running on port 4000");
+io.on("connection", socket => {
+  console.log(`a user connected ${socket.id}`);
+
+  socket.on("disconnect", () => {
+    console.log(`a user disconnected ${socket.id}`);
+  });
+
+  socket.on("send_message", async ({ userMessage }) => {
+    const botMessage = await getAssistantMessage(userMessage);
+    socket.emit("receive_message", {
+      userMessage,
+      botMessage,
+    });
+  });
+});
+
+server.listen(4000, () => {
+  console.log("listening on port:4000");
 });

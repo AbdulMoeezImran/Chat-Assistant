@@ -7,9 +7,13 @@
     "i-client": "npm install --prefix Chat-Assistant-Frontend",
     "i-server": "npm install --prefix Chat-Assistant-Backend",
     "client": "npm start --prefix Chat-Assistant-Frontend",
-    "server": "npm start --prefix Chat-Assistant-Backend"
+    "server": "npm start --prefix Chat-Assistant-Backend",
+    "dev": "concurrently \"npm run client\" \"npm run server\""
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
 }
