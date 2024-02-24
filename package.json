@@ -1,0 +1,15 @@
+{
+  "name": "chat-assistant",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "i-client": "npm install --prefix Chat-Assistant-Frontend",
+    "i-server": "npm install --prefix Chat-Assistant-Backend",
+    "client": "npm start --prefix Chat-Assistant-Frontend",
+    "server": "npm start --prefix Chat-Assistant-Backend"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
