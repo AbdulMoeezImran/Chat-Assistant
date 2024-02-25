@@ -12,6 +12,8 @@ const io = new Server(server, {
   cors: { origin: "http://localhost:3000", methods: ["GET", "POST"] },
 });
 
+let chatId = 0;
+
 app.use(express.json());
 app.use(cors());
 
@@ -20,20 +22,25 @@ const openai = new OpenAI({
   apiKey,
 });
 
-async function getAssistantMessage(message) {
-  const completion = await openai.chat.completions.create({
-    messages: [{ role: "system", content: message }],
+async function getAssistantMessage(userMessage, socket) {
+  const stream = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
+    messages: [{ role: "system", content: userMessage }],
+    stream: true,
   });
-  return completion.choices[0].message.content;
-}
 
-app.post("/", async (req, res) => {
-  const { message } = req.body;
-  const botMessage = await getAssistantMessage(message);
-  console.log({ userMessage: message, botMessage });
-  res.json({ userMessage: message, botMessage });
-});
+  // Emit each chunk of the response separately to the client
+  for await (const chunk of stream) {
+    const botMessage = chunk.choices[0]?.delta?.content || "";
+    if (botMessage.trim() !== "") {
+      socket.emit("receive_message", {
+        chatId,
+        userMessage,
+        botMessage,
+      });
+    }
+  }
+}
 
 io.on("connection", socket => {
   console.log(`a user connected ${socket.id}`);
@@ -43,11 +50,8 @@ io.on("connection", socket => {
   });
 
   socket.on("send_message", async ({ userMessage }) => {
-    const botMessage = await getAssistantMessage(userMessage);
-    socket.emit("receive_message", {
-      userMessage,
-      botMessage,
-    });
+    chatId++;
+    await getAssistantMessage(userMessage, socket);
   });
 });
 

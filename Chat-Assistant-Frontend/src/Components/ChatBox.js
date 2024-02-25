@@ -5,10 +5,40 @@ const ChatBox = ({ socket }) => {
   const [chatHistory, setChatHistory] = useState([]);
   const [isWaiting, setIsWaiting] = useState(false);
 
+  console.log(chatHistory);
+
   useEffect(() => {
     const handleMessage = (data) => {
-      console.log("receive_message", data);
-      setChatHistory((prevChatHistory) => [...prevChatHistory, data]);
+      setChatHistory((prevChatHistory) => {
+        // Check if there's an existing chat message with the same chatId
+        const existingChatIndex = prevChatHistory.findIndex(
+          (item) => item.chatId === data.chatId,
+        );
+
+        if (existingChatIndex !== -1) {
+          // If chat message with same id exists, update its botMessage
+          return prevChatHistory.map((item, index) => {
+            if (index === existingChatIndex) {
+              return {
+                ...item,
+                botMessage: item.botMessage + data.botMessage,
+              };
+            }
+            return item;
+          });
+        } else {
+          // If chat message with same id doesn't exist, add a new chat message
+          return [
+            ...prevChatHistory,
+            {
+              chatId: data.chatId,
+              userMessage: data.userMessage,
+              botMessage: data.botMessage,
+            },
+          ];
+        }
+      });
+
       setIsWaiting(false);
     };
 
