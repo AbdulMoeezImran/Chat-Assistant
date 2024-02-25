@@ -1,28 +1,38 @@
 import http from "http";
-import express from "express";
-import OpenAI from "openai";
-import cors from "cors";
+import app from "./app.js";
+import mongoose from "mongoose";
 import dotenv from "dotenv";
+import OpenAI from "openai";
 import { Server } from "socket.io";
+import Chat from "./Chat.mongo.js";
 
+let DEFAULT_CHAT_ID = 0;
 dotenv.config();
-const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "http://localhost:3000", methods: ["GET", "POST"] },
-});
 
-let chatId = 0;
-
-app.use(express.json());
-app.use(cors());
-
-const apiKey = process.env.apiKey;
+// OpenAi responses in real-time
 const openai = new OpenAI({
-  apiKey,
+  apiKey: "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",
 });
+
+const io = new Server(server, {
+  cors: true,
+});
+
+async function getLatestChatId() {
+  const latestChatId = await Chat.findOne().sort("-chatId");
+
+  if (!latestChatId) {
+    return DEFAULT_CHAT_ID;
+  }
+
+  return latestChatId.chatId;
+}
 
 async function getAssistantMessage(userMessage, socket) {
+  const newChatId = (await getLatestChatId()) + 1;
+  let CompleteBotMessage = "";
+
   const stream = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [{ role: "system", content: userMessage }],
@@ -32,11 +42,20 @@ async function getAssistantMessage(userMessage, socket) {
   // Emit each chunk of the response separately to the client
   for await (const chunk of stream) {
     const botMessage = chunk.choices[0]?.delta?.content || "";
+    CompleteBotMessage += chunk.choices[0]?.delta?.content || "";
     if (botMessage.trim() !== "") {
       socket.emit("receive_message", {
-        chatId,
+        chatId: newChatId,
         userMessage,
         botMessage,
+      });
+    }
+
+    if (chunk.choices[0]?.finish_reason === "stop") {
+      await Chat.create({
+        chatId: newChatId,
+        userMessage,
+        botMessage: CompleteBotMessage,
       });
     }
   }
@@ -50,11 +69,29 @@ io.on("connection", socket => {
   });
 
   socket.on("send_message", async ({ userMessage }) => {
-    chatId++;
     await getAssistantMessage(userMessage, socket);
   });
 });
 
-server.listen(4000, () => {
-  console.log("listening on port:4000");
+// MongoDB
+const MONGO_URL = process.env.DB_URL;
+
+mongoose.connection.once("open", () =>
+  console.log("MongoDB connection ready!")
+);
+
+mongoose.connection.on("error", err => {
+  console.error(err);
 });
+
+const startServer = async () => {
+  await mongoose.connect(
+    "mongodb+srv://nasa-api:!Q2w3e4r@nasacluster.cwoin1h.mongodb.net/NASA?retryWrites=true&w=majority"
+  );
+
+  server.listen(4000, () => {
+    console.log("listening on port:4000");
+  });
+};
+
+startServer();

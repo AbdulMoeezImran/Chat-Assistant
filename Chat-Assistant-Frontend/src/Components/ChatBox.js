@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import "./ChatBox.css";
 
 const ChatBox = ({ socket }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [isWaiting, setIsWaiting] = useState(false);
-
-  console.log(chatHistory);
+  const [getMessages, setGetMessages] = useState(false);
+  const chatContainerRef = useRef(null);
 
   useEffect(() => {
     const handleMessage = (data) => {
@@ -40,91 +41,134 @@ const ChatBox = ({ socket }) => {
       });
 
       setIsWaiting(false);
+      setMessage("");
     };
 
     socket.on("receive_message", handleMessage);
-    console.log("mounted");
 
     return () => {
       socket.off("receive_message", handleMessage);
-      console.log("unmounted");
     };
   }, [socket]);
+
+  useEffect(() => {
+    setGetMessages(true);
+    const fetchMessages = async () => {
+      const response = await fetch("http://192.168.1.105:4000/chat", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (response) {
+        const data = await response.json();
+        setChatHistory(data);
+        setGetMessages(false);
+      }
+    };
+    fetchMessages();
+  }, []);
 
   const handleSendMessage = async () => {
     if (message.trim() === "") {
       return;
     }
 
-    setMessage("");
     setIsWaiting(true);
 
     socket.emit("send_message", { userMessage: message });
   };
 
-  return (
-    <div className="flex h-screen flex-col">
-      <div className="flex-1 overflow-y-scroll bg-gray-200">
-        <div className="flex flex-col gap-5 px-4 py-2">
-          <div className="mb-2 flex items-center">
-            <img
-              className="mr-2 size-10 bg-black p-1.5"
-              src={process.env.PUBLIC_URL + "/Images/chatgpt.png"}
-              alt="User Avatar"
-            />
-            <div className="text-xl font-medium">ChatGPT 3.5 Turbo</div>
-          </div>
-          {chatHistory.map((chat, index) => (
-            <div key={index} className="flex flex-col gap-5 py-2">
-              <div className="flex justify-end gap-2">
-                <div className="w-fit max-w-[80%] rounded-lg bg-blue-500 p-2 text-lg text-white shadow md:max-w-[60%]">
-                  {chat.userMessage}
-                </div>
-                <img
-                  className="size-10 rounded-full"
-                  src={process.env.PUBLIC_URL + "/Images/user-avatar.png"}
-                  alt="User Avatar"
-                />
-              </div>
-              <div className="flex gap-2">
-                <img
-                  className="size-10 rounded-full bg-black p-1.5"
-                  src={process.env.PUBLIC_URL + "/Images/chatgpt.png"}
-                  alt="User Avatar"
-                />
-                <div className="w-fit max-w-[80%] rounded-lg bg-white p-2 text-lg shadow md:max-w-[60%]">
-                  {chat.botMessage}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop =
+        chatContainerRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
+  return getMessages ? (
+    <div className="flex h-screen items-center justify-center overflow-hidden bg-[#1b1b1b]">
+      <div className="h-20 w-20 animate-spin rounded-full border-4 border-solid border-white border-t-transparent shadow-md" />
+    </div>
+  ) : (
+    <div className="flex h-screen flex-col bg-[#1b1b1b]">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-5 py-3">
+        <img
+          className="size-10"
+          src={process.env.PUBLIC_URL + "/Images/chatgpt.png"}
+          alt="User Avatar"
+        />
+        <div className="text-xl font-medium">ChatGPT 3.5 Turbo</div>
       </div>
-      <div className="bg-gray-100 px-4 py-2">
-        <div className="flex items-center">
-          <div className="flex w-full items-center justify-center rounded-3xl bg-white px-5 py-2">
-            <input
-              type="text"
-              className="w-full text-xl text-black outline-none"
-              placeholder="Type your message..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-            />
-            {isWaiting ? (
-              <div className="flex gap-1">
-                <div className="size-2 animate-pulse rounded-full bg-black"></div>
-                <div className="size-2 animate-pulse rounded-full bg-black"></div>
-                <div className="size-2 animate-pulse rounded-full bg-black"></div>
+
+      {/* Chat History */}
+      {chatHistory.length === 0 ? (
+        <div className="flex h-full flex-col items-center justify-center gap-5 px-5 py-3">
+          <img
+            src="./Images/chatgpt.png"
+            alt="gpt-logo "
+            className="h-20 w-20"
+          />
+          <p className="text-2xl font-medium">How can I help you today?</p>
+        </div>
+      ) : (
+        <div
+          id="scroll-bar"
+          ref={chatContainerRef}
+          className="h-full flex-1 overflow-y-scroll px-5 py-3"
+        >
+          <div className="flex h-full flex-col gap-5">
+            {chatHistory.map((chat, index) => (
+              <div key={index} className="flex flex-col gap-5 py-2">
+                <div className="flex justify-end gap-2">
+                  <div className="w-fit max-w-[80%] rounded-lg bg-[#353535] p-2 text-lg text-white shadow md:max-w-[60%]">
+                    {chat.userMessage}
+                  </div>
+                  <img
+                    className="size-10 rounded-full"
+                    src={process.env.PUBLIC_URL + "/Images/user-avatar.png"}
+                    alt="User Avatar"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <img
+                    className="size-10 rounded-full bg-black p-1.5"
+                    src={process.env.PUBLIC_URL + "/Images/chatgpt.png"}
+                    alt="User Avatar"
+                  />
+                  <div className="w-fit max-w-[80%] rounded-lg bg-[#353535] p-2 text-lg shadow md:max-w-[60%]">
+                    {chat.botMessage}
+                  </div>
+                </div>
               </div>
-            ) : (
-              <i
-                className="fas fa-paper-plane cursor-pointer text-lg text-black"
-                onClick={handleSendMessage}
-              ></i>
-            )}
+            ))}
           </div>
         </div>
+      )}
+
+      {/* Input field */}
+      <div className="mx-5 mb-8 mt-3 flex items-center justify-center rounded-3xl border border-white px-5">
+        <input
+          type="text"
+          className="w-full bg-transparent py-2 text-xl outline-none"
+          placeholder="Message assistant..."
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+        />
+        {isWaiting ? (
+          <div className="flex gap-1">
+            <div className="size-2 animate-pulse rounded-full bg-white"></div>
+            <div className="size-2 animate-pulse rounded-full bg-white"></div>
+            <div className="size-2 animate-pulse rounded-full bg-white"></div>
+          </div>
+        ) : (
+          <i
+            className="fas fa-paper-plane cursor-pointer text-lg"
+            onClick={handleSendMessage}
+          ></i>
+        )}
       </div>
     </div>
   );
